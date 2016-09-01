@@ -43,7 +43,7 @@
     dispatch_once(&onceToken, ^{
         sharedInstance = [self new];
     });
-
+    
     return sharedInstance;
 }
 
@@ -58,11 +58,11 @@
 
 #pragma mark - Authorization Methods (Public)
 - (void)verifyUserInViewController:(UIViewController *)externalViewController
-                     withClientID:(NSString *)clientID
-                      redirectURI:(NSString *)redirectURI
-                            scope:(NSString *)scope
-                      withResults:(IDmeVerifyWebVerifyResults)webVerificationResults {
-
+                      withClientID:(NSString *)clientID
+                       redirectURI:(NSString *)redirectURI
+                             scope:(NSString *)scope
+                       withResults:(IDmeVerifyWebVerifyResults)webVerificationResults {
+    
     [self clearWebViewCacheAndCookies];
     [self setClientID:clientID];
     [self setRedirectURI:redirectURI];
@@ -74,7 +74,7 @@
 
 #pragma mark - Authorization Methods (Private)
 - (void)launchWebNavigationController {
-
+    
     // Initialize _webView
     _webView = [self createWebView];
     
@@ -89,12 +89,12 @@
         [self loadWebViewWithAccessTokenRequestPage];
         
     }];
-
+    
 }
 
 - (void)loadWebViewWithAccessTokenRequestPage {
     NSString *requestString = [NSString stringWithFormat:IDME_WEB_VERIFY_GET_AUTH_URI, _clientID, _redirectURI, _scope];
-
+    
     requestString = [requestString stringByAddingPercentEscapesUsingEncoding:NSUTF8StringEncoding];
     NSURL *requestURL = [NSURL URLWithString:requestString];
     NSURLRequest *request = [NSURLRequest requestWithURL:requestURL];
@@ -108,7 +108,7 @@
     NSURL *requestURL = [NSURL URLWithString:requestString];
     NSMutableURLRequest *request = [NSMutableURLRequest requestWithURL:requestURL];
     [request setValue:@"IDmeWebVerify-SDK-iOS" forHTTPHeaderField:@"X-API-ORIGIN"];
-
+    
     NSURLSession *session = [NSURLSession sharedSession];
     NSURLSessionDataTask *task = [session dataTaskWithRequest:request completionHandler:^(NSData *data, NSURLResponse *response, NSError *error) {
         dispatch_async(dispatch_get_main_queue(), ^{
@@ -125,12 +125,10 @@
                                                                     code:IDmeWebVerifyErrorCodeVerificationDidFailToFetchUserProfile
                                                                 userInfo:error.userInfo];
                 _webVerificationResults(nil, modifiedError);
+                // Dismiss _webViewController and clear _webView cache
+                [self destroyWebNavigationController:self];
             }
-            
-            // Dismiss _webViewController and clear _webView cache
-            [self destroyWebNavigationController:self];
         });
-
     }];
     [task resume];
 }
@@ -158,7 +156,7 @@
         [_webView removeFromSuperview];
         [self setWebView:nil];
     }
-
+    
 }
 
 - (void)clearWebViewCacheAndCookies {
@@ -179,6 +177,7 @@
 - (IDmeWebVerifyNavigationController * _Nonnull)createWebNavigationController {
     // Initialize webViewController
     UIViewController *webViewController = [[UIViewController alloc] init];
+    webViewController.view.backgroundColor = [UIColor colorWithWhite:.95 alpha:1.f];
     [webViewController.view setFrame:[_webView frame]];
     [webViewController setTitle:@"Verify with ID.me"];
     [webViewController.view addSubview:[self webView]];
@@ -188,17 +187,10 @@
                                                                             style:UIBarButtonItemStyleDone
                                                                            target:self
                                                                            action:@selector(destroyWebNavigationController:)];
-    NSDictionary *buttonAttributes = @{NSForegroundColorAttributeName : kIDmeWebVerifyColorLightBlue};
-    [cancelBarButtonItem setTitleTextAttributes:buttonAttributes forState:UIControlStateNormal];
-    [cancelBarButtonItem setTintColor:kIDmeWebVerifyColorGreen];
     [webViewController.navigationItem setLeftBarButtonItem:cancelBarButtonItem];
     
     // Initialize and customize UINavigationController with webViewController
     IDmeWebVerifyNavigationController *navigationController = [[IDmeWebVerifyNavigationController alloc] initWithRootViewController:webViewController];
-    NSDictionary *titleAttributes = @{NSForegroundColorAttributeName : kIDmeWebVerifyColorGreen};
-    [navigationController.navigationBar setTitleTextAttributes:titleAttributes];
-    [navigationController.navigationBar setTintColor:kIDmeWebVerifyColorLightBlue];
-    [navigationController.navigationBar setBarTintColor:kIDmeWebVerifyColorDarkBlue];
     
     return navigationController;
 }
@@ -258,7 +250,7 @@
     
     // Get string of current visible webpage
     NSString *query = [[webView.request.mainDocumentURL absoluteString] copy];
-
+    
     if (query) {
         
         /*
@@ -273,7 +265,7 @@
     }
     
     NSDictionary *parameters = [self parseQueryParametersFromURL:query];
-
+    
     if ([parameters objectForKey:IDME_WEB_VERIFY_ACCESS_TOKEN_PARAM]) {
         
         // Extract 'access_token' from URL query parameters that are separated by '&'
@@ -293,7 +285,8 @@
     }
 }
 
-- (BOOL)webView:(UIWebView *)webView shouldStartLoadWithRequest:(NSURLRequest *)request navigationType:(UIWebViewNavigationType)navigationType{
+- (BOOL)webView:(UIWebView *)webView shouldStartLoadWithRequest:(NSURLRequest *)request navigationType:(UIWebViewNavigationType)navigationType {
+    self.webView.alpha = [request.URL.absoluteString containsString:self.redirectURI] ? 0.f : 1.f;
     return YES;
 }
 
